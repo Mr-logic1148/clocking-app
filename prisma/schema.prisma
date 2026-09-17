@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  EMPLOYEE
+}
+
+enum TimeEntryStatus {
+  ACTIVE
+  COMPLETED
+}
+
+enum TimeEntrySource {
+  KIOSK
+  MANUAL
+  SYSTEM
+}
+
+model User {
+  id                 String      @id @default(cuid())
+  name               String
+  email              String      @unique
+  /// bcrypt hash — never store plaintext passwords
+  passwordHash       String
+  role               Role        @default(EMPLOYEE)
+  /// HMAC-SHA256(PIN, PIN_PEPPER) — unique so kiosk lookup is O(1) without reversing the PIN
+  pinHash            String?     @unique
+  isActive           Boolean     @default(true)
+  hourlyRate         Decimal?    @db.Decimal(10, 2)
+  failedPinAttempts  Int         @default(0)
+  pinLockedUntil     DateTime?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  timeEntries        TimeEntry[]
+  approvedEntries    TimeEntry[] @relation("ApprovedBy")
+}
+
+model TimeEntry {
+  id            String           @id @default(cuid())
+  userId        String
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clockIn       DateTime
+  clockOut      DateTime?
+  totalMinutes  Int?
+  status        TimeEntryStatus  @default(ACTIVE)
+  source        TimeEntrySource  @default(KIOSK)
+  needsReview   Boolean          @default(false)
+  notes         String?
+  approvedAt    DateTime?
+  approvedById  String?
+  approvedBy    User?            @relation("ApprovedBy", fields: [approvedById], references: [id])
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  breaks        BreakLog[]
+
+  @@index([userId, clockIn])
+  @@index([status])
+}
+
+model BreakLog {
+  id              String     @id @default(cuid())
+  timeEntryId     String
+  timeEntry       TimeEntry  @relation(fields: [timeEntryId], references: [id], onDelete: Cascade)
+  breakStart      DateTime
+  breakEnd        DateTime?
+  durationMinutes Int?
+  createdAt       DateTime   @default(now())
+
+  @@index([timeEntryId])
+}
+
+/// Persisted kiosk PIN brute-force counters (per IP).
+model PinRateLimit {
+  id          String   @id @default(cuid())
+  identifier  String   @unique
+  attempts    Int      @default(0)
+  windowStart DateTime @default(now())
+  lockedUntil DateTime?
+  updatedAt   DateTime @updatedAt
+}
