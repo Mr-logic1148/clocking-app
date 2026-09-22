@@ -19,14 +19,14 @@ const tone = {
   CLOCKED_OUT: "neutral",
 } as const;
 
-export function LiveBoard() {
+export function LiveBoard({ endpoint = "/api/admin/live" }: { endpoint?: string }) {
   const [board, setBoard] = useState<Row[]>([]);
   const [at, setAt] = useState<string>("");
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      const res = await fetch("/api/admin/live", { cache: "no-store" });
+      const res = await fetch(endpoint, { cache: "no-store" });
       if (!res.ok) return;
       const data = await res.json();
       if (!cancelled) {
@@ -40,7 +40,7 @@ export function LiveBoard() {
       cancelled = true;
       clearInterval(id);
     };
-  }, []);
+  }, [endpoint]);
 
   const groups = {
     CLOCKED_IN: board.filter((b) => b.status === "CLOCKED_IN"),

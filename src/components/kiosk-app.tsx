@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { KIOSK_IDLE_MS, minutesToHoursLabel } from "@/lib/utils";
 import type { KioskSnapshot } from "@/lib/time-engine";
+import { KioskBanner } from "@/components/kiosk-banner";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "⌫"];
 
@@ -16,6 +17,7 @@ export function KioskApp() {
   const [snapshot, setSnapshot] = useState<KioskSnapshot | null>(null);
   const [remaining, setRemaining] = useState(KIOSK_IDLE_MS);
   const timer = useRef<number | null>(null);
+  const lastTouch = useRef(Date.now());
 
   const logout = useCallback(async (silent = false) => {
     setSnapshot(null);
@@ -25,11 +27,16 @@ export function KioskApp() {
     if (!silent) toast.message("Returned to kiosk lock screen");
   }, []);
 
+  const bumpIdle = useCallback(() => {
+    lastTouch.current = Date.now();
+    setRemaining(KIOSK_IDLE_MS);
+  }, []);
+
   useEffect(() => {
     if (!snapshot) return;
-    const started = Date.now();
+    lastTouch.current = Date.now();
     timer.current = window.setInterval(() => {
-      const left = KIOSK_IDLE_MS - (Date.now() - started);
+      const left = KIOSK_IDLE_MS - (Date.now() - lastTouch.current);
       setRemaining(Math.max(0, left));
       if (left <= 0) {
         void logout(true);
@@ -110,6 +117,7 @@ export function KioskApp() {
           <Leaf className="h-6 w-6" />
           <p className="text-sm font-semibold tracking-wide uppercase">Harvest Clock · Kiosk</p>
         </div>
+        <KioskBanner />
         <AnimatePresence mode="wait">
           {!snapshot ? (
             <motion.div
@@ -156,6 +164,8 @@ export function KioskApp() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -12 }}
               className="flex flex-1 flex-col"
+              onPointerDown={bumpIdle}
+              onKeyDown={bumpIdle}
             >
               <p className="text-sm text-emerald-200">Welcome back</p>
               <h1 className="text-4xl font-semibold">{snapshot.name}</h1>

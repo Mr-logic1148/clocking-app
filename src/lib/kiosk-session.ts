@@ -13,7 +13,7 @@ function secret() {
 export type KioskToken = {
   sub: string;
   name: string;
-  role: "ADMIN" | "EMPLOYEE";
+  role: "ADMIN" | "MANAGER" | "EMPLOYEE";
 };
 
 export async function signKioskToken(payload: KioskToken) {
