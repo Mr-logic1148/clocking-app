@@ -25,7 +25,8 @@ export async function assertPinRateLimit(identifier: string) {
     throw new RateLimitError(record.lockedUntil.getTime() - now.getTime());
   }
 
-  if (now.getTime() - record.windowStart.getTime() > WINDOW_MS) {
+  const windowExpired = now.getTime() - record.windowStart.getTime() > WINDOW_MS;
+  if (windowExpired || (record.lockedUntil && record.lockedUntil <= now)) {
     await prisma.pinRateLimit.update({
       where: { identifier },
       data: { attempts: 0, windowStart: now, lockedUntil: null },
@@ -35,13 +36,24 @@ export async function assertPinRateLimit(identifier: string) {
 
 export async function recordPinFailure(identifier: string) {
   const now = new Date();
-  await prisma.pinRateLimit.upsert({
+  const existing = await prisma.pinRateLimit.findUnique({ where: { identifier } });
+  const windowExpired =
+    !existing || now.getTime() - existing.windowStart.getTime() > WINDOW_MS;
+
+  if (!existing || windowExpired) {
+    await prisma.pinRateLimit.upsert({
+      where: { identifier },
+      create: { identifier, attempts: 1, windowStart: now, lockedUntil: null },
+      update: { attempts: 1, windowStart: now, lockedUntil: null },
+    });
+    return;
+  }
+
+  const fresh = await prisma.pinRateLimit.update({
     where: { identifier },
-    create: { identifier, attempts: 1, windowStart: now },
-    update: { attempts: { increment: 1 } },
+    data: { attempts: { increment: 1 } },
   });
 
-  const fresh = await prisma.pinRateLimit.findUniqueOrThrow({ where: { identifier } });
   if (fresh.attempts >= MAX_ATTEMPTS) {
     await prisma.pinRateLimit.update({
       where: { identifier },

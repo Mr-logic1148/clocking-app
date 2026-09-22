@@ -83,7 +83,7 @@ export function startOfLocalMonth(date = new Date()) {
   return utcFromZoned(p.year, p.month, 1);
 }
 
-function closedMinutes(clockIn: Date, clockOut: Date, breaks: { breakStart: Date; breakEnd: Date | null }[]) {
+export function closedMinutes(clockIn: Date, clockOut: Date, breaks: { breakStart: Date; breakEnd: Date | null }[]) {
   let ms = clockOut.getTime() - clockIn.getTime();
   for (const b of breaks) {
     const end = b.breakEnd ?? clockOut;
@@ -182,9 +182,14 @@ export async function getKioskSnapshot(userId: string): Promise<KioskSnapshot> {
   };
 }
 
+async function lockUserShift(tx: Prisma.TransactionClient, userId: string) {
+  await tx.$executeRaw`SELECT id FROM "User" WHERE id = ${userId} FOR UPDATE`;
+  await tx.$executeRaw`SELECT id FROM "TimeEntry" WHERE "userId" = ${userId} AND status = 'ACTIVE' FOR UPDATE`;
+}
+
 export async function clockIn(userId: string, source: TimeEntrySource = "KIOSK") {
   return prisma.$transaction(async (tx) => {
-    await tx.$executeRaw`SELECT id FROM "User" WHERE id = ${userId} FOR UPDATE`;
+    await lockUserShift(tx, userId);
     const existing = await tx.timeEntry.findFirst({
       where: { userId, status: "ACTIVE" },
     });
@@ -199,6 +204,7 @@ export async function clockIn(userId: string, source: TimeEntrySource = "KIOSK")
 
 export async function startBreak(userId: string) {
   return prisma.$transaction(async (tx) => {
+    await lockUserShift(tx, userId);
     const entry = await tx.timeEntry.findFirst({
       where: { userId, status: "ACTIVE" },
       include: { breaks: true },
@@ -213,6 +219,7 @@ export async function startBreak(userId: string) {
 
 export async function endBreak(userId: string) {
   return prisma.$transaction(async (tx) => {
+    await lockUserShift(tx, userId);
     const entry = await tx.timeEntry.findFirst({
       where: { userId, status: "ACTIVE" },
       include: { breaks: true },
@@ -231,6 +238,7 @@ export async function endBreak(userId: string) {
 
 export async function clockOut(userId: string) {
   return prisma.$transaction(async (tx) => {
+    await lockUserShift(tx, userId);
     const entry = await tx.timeEntry.findFirst({
       where: { userId, status: "ACTIVE" },
       include: { breaks: true },

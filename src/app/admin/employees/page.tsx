@@ -13,7 +13,7 @@ export default async function EmployeesPage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">People</h1>
-        <p className="text-stone-600">Create staff, reset PINs, set pay rates, deactivate leavers.</p>
+        <p className="text-stone-600">Create staff, reset PINs, set pay rates, deactivate leavers. Promote managers in Roles.</p>
       </div>
 
       <Card>

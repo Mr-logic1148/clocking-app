@@ -6,6 +6,11 @@ import { getKioskSnapshot, startOfLocalWeek } from "@/lib/time-engine";
 import { minutesToHoursLabel } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ActionForm } from "@/components/action-form";
+import { markBroadcastRead, requestLeave, requestShiftSwap } from "@/app/me/actions";
 
 export default async function MePage() {
   const session = await auth();
@@ -13,11 +18,32 @@ export default async function MePage() {
 
   const snapshot = await getKioskSnapshot(session.user.id);
   const from = startOfLocalWeek();
-  const entries = await prisma.timeEntry.findMany({
-    where: { userId: session.user.id, clockIn: { gte: from } },
-    include: { breaks: true },
-    orderBy: { clockIn: "desc" },
-  });
+  const [entries, leaves, myShifts, otherShifts, alerts] = await Promise.all([
+    prisma.timeEntry.findMany({
+      where: { userId: session.user.id, clockIn: { gte: from } },
+      include: { breaks: true },
+      orderBy: { clockIn: "desc" },
+    }),
+    prisma.leaveRequest.findMany({
+      where: { userId: session.user.id },
+      orderBy: { createdAt: "desc" },
+      take: 8,
+    }),
+    prisma.shiftAssignment.findMany({
+      where: { userId: session.user.id, startsAt: { gte: from } },
+      orderBy: { startsAt: "asc" },
+    }),
+    prisma.shiftAssignment.findMany({
+      where: { user: { role: "EMPLOYEE" }, userId: { not: session.user.id }, startsAt: { gte: from } },
+      include: { user: true },
+      orderBy: { startsAt: "asc" },
+      take: 40,
+    }),
+    prisma.floorBroadcastReceipt.findMany({
+      where: { userId: session.user.id, readAt: null, broadcast: { expiresAt: { gt: new Date() } } },
+      include: { broadcast: { include: { manager: { select: { name: true } } } } },
+    }),
+  ]);
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
@@ -33,6 +59,11 @@ export default async function MePage() {
               <Link href="/admin">Admin</Link>
             </Button>
           )}
+          {session.user.role === "MANAGER" && (
+            <Button asChild variant="outline">
+              <Link href="/manager/dashboard">Manager hub</Link>
+            </Button>
+          )}
           <form
             action={async () => {
               "use server";
@@ -45,6 +76,26 @@ export default async function MePage() {
           </form>
         </div>
       </div>
+
+      {alerts.map((a) => (
+        <div key={a.id} className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 p-4">
+          <p className="text-xs font-semibold uppercase text-amber-800">
+            Floor request · {a.broadcast.manager.name}
+          </p>
+          <p className="font-medium">{a.broadcast.message}</p>
+          <form
+            className="mt-2"
+            action={async () => {
+              "use server";
+              await markBroadcastRead(a.broadcastId);
+            }}
+          >
+            <Button size="sm" variant="outline" type="submit">
+              Dismiss
+            </Button>
+          </form>
+        </div>
+      ))}
 
       <div className="mb-6 grid grid-cols-3 gap-3">
         <Card>
@@ -73,7 +124,7 @@ export default async function MePage() {
         </Card>
       </div>
 
-      <Card>
+      <Card className="mb-6">
         <CardHeader>
           <CardTitle>This week</CardTitle>
         </CardHeader>
@@ -92,6 +143,87 @@ export default async function MePage() {
           ))}
         </CardContent>
       </Card>
+
+      {session.user.role === "EMPLOYEE" && (
+        <>
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Request leave</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ActionForm action={requestLeave} success="Leave submitted" className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-1">
+                  <Label>Type</Label>
+                  <select name="type" className="h-11 w-full rounded-xl border px-3 text-sm">
+                    <option value="HOLIDAY">Holiday</option>
+                    <option value="SICK">Sick</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Start</Label>
+                  <Input name="startDate" type="date" required />
+                </div>
+                <div className="space-y-1">
+                  <Label>End</Label>
+                  <Input name="endDate" type="date" required />
+                </div>
+                <div className="space-y-1 md:col-span-2">
+                  <Label>Note</Label>
+                  <Input name="employeeNote" />
+                </div>
+                <Button type="submit">Submit request</Button>
+              </ActionForm>
+              <div className="mt-4 space-y-2">
+                {leaves.map((l) => (
+                  <div key={l.id} className="flex items-center justify-between text-sm">
+                    <span>
+                      {l.type} · {l.startDate.toLocaleDateString()}–{l.endDate.toLocaleDateString()}
+                    </span>
+                    <Badge tone={l.status === "PENDING" ? "amber" : l.status === "APPROVED" ? "green" : "rose"}>
+                      {l.status}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Shift swap</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {myShifts.length === 0 || otherShifts.length === 0 ? (
+                <p className="text-sm text-stone-500">Swaps appear once managers publish shifts for two people.</p>
+              ) : (
+                <ActionForm action={requestShiftSwap} success="Swap requested" className="grid gap-3">
+                  <div className="space-y-1">
+                    <Label>My shift</Label>
+                    <select name="requesterShiftId" required className="h-11 w-full rounded-xl border px-3 text-sm">
+                      {myShifts.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.startsAt.toLocaleString()}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Swap with</Label>
+                    <select name="counterpartShiftId" required className="h-11 w-full rounded-xl border px-3 text-sm">
+                      {otherShifts.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.user.name} · {s.startsAt.toLocaleString()}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <Button type="submit">Request swap</Button>
+                </ActionForm>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
     </main>
   );
 }

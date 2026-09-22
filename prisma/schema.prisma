@@ -9,6 +9,7 @@ datasource db {
 
 enum Role {
   ADMIN
+  MANAGER
   EMPLOYEE
 }
 
@@ -23,65 +24,196 @@ enum TimeEntrySource {
   SYSTEM
 }
 
+enum LeaveType {
+  HOLIDAY
+  SICK
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model User {
-  id                 String      @id @default(cuid())
-  name               String
-  email              String      @unique
+  id                String      @id @default(cuid())
+  name              String
+  email             String      @unique
   /// bcrypt hash — never store plaintext passwords
-  passwordHash       String
-  role               Role        @default(EMPLOYEE)
+  passwordHash      String
+  role              Role        @default(EMPLOYEE)
   /// HMAC-SHA256(PIN, PIN_PEPPER) — unique so kiosk lookup is O(1) without reversing the PIN
-  pinHash            String?     @unique
-  isActive           Boolean     @default(true)
-  hourlyRate         Decimal?    @db.Decimal(10, 2)
-  failedPinAttempts  Int         @default(0)
-  pinLockedUntil     DateTime?
-  createdAt          DateTime    @default(now())
-  updatedAt          DateTime    @updatedAt
-  timeEntries        TimeEntry[]
-  approvedEntries    TimeEntry[] @relation("ApprovedBy")
+  pinHash           String?     @unique
+  isActive          Boolean     @default(true)
+  hourlyRate        Decimal?    @db.Decimal(10, 2)
+  failedPinAttempts Int         @default(0)
+  pinLockedUntil    DateTime?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  timeEntries       TimeEntry[]
+  approvedEntries   TimeEntry[] @relation("ApprovedBy")
+  auditsAsManager   AuditLog[]  @relation("ManagerAudits")
+  auditsAsTarget    AuditLog[]  @relation("TargetUserAudits")
+  leaveRequests     LeaveRequest[]
+  leaveReviews      LeaveRequest[] @relation("LeaveReviewedBy")
+  shifts            ShiftAssignment[]
+  shiftsCreated     ShiftAssignment[] @relation("ShiftCreatedBy")
+  swapsRequested    ShiftSwapRequest[] @relation("SwapRequester")
+  swapsReceived     ShiftSwapRequest[] @relation("SwapCounterpart")
+  swapsReviewed     ShiftSwapRequest[] @relation("SwapReviewedBy")
+  broadcastsSent    FloorBroadcast[]
+  broadcastReceipts FloorBroadcastReceipt[]
+
+  @@index([role])
 }
 
 model TimeEntry {
-  id            String           @id @default(cuid())
-  userId        String
-  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  clockIn       DateTime
-  clockOut      DateTime?
-  totalMinutes  Int?
-  status        TimeEntryStatus  @default(ACTIVE)
-  source        TimeEntrySource  @default(KIOSK)
-  needsReview   Boolean          @default(false)
-  notes         String?
-  approvedAt    DateTime?
-  approvedById  String?
-  approvedBy    User?            @relation("ApprovedBy", fields: [approvedById], references: [id])
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  breaks        BreakLog[]
+  id           String          @id @default(cuid())
+  userId       String
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clockIn      DateTime
+  clockOut     DateTime?
+  totalMinutes Int?
+  status       TimeEntryStatus @default(ACTIVE)
+  source       TimeEntrySource @default(KIOSK)
+  needsReview  Boolean         @default(false)
+  notes        String?
+  approvedAt   DateTime?
+  approvedById String?
+  approvedBy   User?           @relation("ApprovedBy", fields: [approvedById], references: [id])
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  breaks       BreakLog[]
 
   @@index([userId, clockIn])
   @@index([status])
 }
 
 model BreakLog {
-  id              String     @id @default(cuid())
+  id              String    @id @default(cuid())
   timeEntryId     String
-  timeEntry       TimeEntry  @relation(fields: [timeEntryId], references: [id], onDelete: Cascade)
+  timeEntry       TimeEntry @relation(fields: [timeEntryId], references: [id], onDelete: Cascade)
   breakStart      DateTime
   breakEnd        DateTime?
   durationMinutes Int?
-  createdAt       DateTime   @default(now())
+  createdAt       DateTime  @default(now())
 
   @@index([timeEntryId])
 }
 
+model AuditLog {
+  id            String   @id @default(cuid())
+  managerId     String
+  manager       User     @relation("ManagerAudits", fields: [managerId], references: [id])
+  targetUserId  String
+  targetUser    User     @relation("TargetUserAudits", fields: [targetUserId], references: [id])
+  actionType    String
+  description   String
+  reasonNote    String
+  isReadByAdmin Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@index([isReadByAdmin])
+  @@index([managerId])
+  @@index([createdAt])
+  @@index([actionType])
+}
+
+model LeaveRequest {
+  id           String        @id @default(cuid())
+  userId       String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type         LeaveType
+  startDate    DateTime
+  endDate      DateTime
+  employeeNote String?
+  status       RequestStatus @default(PENDING)
+  reviewedById String?
+  reviewedBy   User?         @relation("LeaveReviewedBy", fields: [reviewedById], references: [id])
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([userId, status])
+  @@index([status])
+}
+
+model ShiftAssignment {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startsAt    DateTime
+  endsAt      DateTime
+  label       String?
+  createdById String
+  createdBy   User     @relation("ShiftCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  swapsAsRequester   ShiftSwapRequest[] @relation("RequesterShift")
+  swapsAsCounterpart ShiftSwapRequest[] @relation("CounterpartShift")
+
+  @@index([userId, startsAt])
+  @@index([startsAt])
+}
+
+model ShiftSwapRequest {
+  id                 String          @id @default(cuid())
+  requesterId        String
+  requester          User            @relation("SwapRequester", fields: [requesterId], references: [id])
+  counterpartId      String
+  counterpart        User            @relation("SwapCounterpart", fields: [counterpartId], references: [id])
+  requesterShiftId   String
+  requesterShift     ShiftAssignment @relation("RequesterShift", fields: [requesterShiftId], references: [id], onDelete: Cascade)
+  counterpartShiftId String
+  counterpartShift   ShiftAssignment @relation("CounterpartShift", fields: [counterpartShiftId], references: [id], onDelete: Cascade)
+  status             RequestStatus   @default(PENDING)
+  reviewedById       String?
+  reviewedBy         User?           @relation("SwapReviewedBy", fields: [reviewedById], references: [id])
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@index([status])
+}
+
+model FloorBroadcast {
+  id          String                   @id @default(cuid())
+  managerId   String
+  manager     User                     @relation(fields: [managerId], references: [id])
+  message     String
+  channel     String                   @default("KIOSK")
+  expiresAt   DateTime
+  createdAt   DateTime                 @default(now())
+  receipts    FloorBroadcastReceipt[]
+}
+
+model FloorBroadcastReceipt {
+  id           String         @id @default(cuid())
+  broadcastId  String
+  broadcast    FloorBroadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveredAt  DateTime       @default(now())
+  readAt       DateTime?
+
+  @@unique([broadcastId, userId])
+  @@index([userId])
+}
+
+/// One-time login tokens for magic-link email (hashed at rest).
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([identifier])
+}
+
 /// Persisted kiosk PIN brute-force counters (per IP).
 model PinRateLimit {
-  id          String   @id @default(cuid())
-  identifier  String   @unique
-  attempts    Int      @default(0)
-  windowStart DateTime @default(now())
+  id          String    @id @default(cuid())
+  identifier  String    @unique
+  attempts    Int       @default(0)
+  windowStart DateTime  @default(now())
   lockedUntil DateTime?
-  updatedAt   DateTime @updatedAt
+  updatedAt   DateTime  @updatedAt
 }

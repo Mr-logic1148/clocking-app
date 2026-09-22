@@ -6,6 +6,7 @@ import { z } from "zod";
 import { requireAdmin } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hashPin, isValidPinFormat } from "@/lib/pin";
+import { closedMinutes } from "@/lib/time-engine";
 import { TimeEntrySource } from "@prisma/client";
 
 const employeeSchema = z.object({
@@ -15,7 +16,7 @@ const employeeSchema = z.object({
   password: z.string().min(8).optional(),
   hourlyRate: z.string().optional(),
   isActive: z.string().optional(),
-  role: z.enum(["ADMIN", "EMPLOYEE"]).optional(),
+  role: z.enum(["ADMIN", "EMPLOYEE", "MANAGER"]).optional(),
 });
 
 export async function createEmployee(formData: FormData) {
@@ -76,7 +77,6 @@ export async function updateEmployee(formData: FormData) {
         name: parsed.data.name,
         email: parsed.data.email.toLowerCase(),
         isActive: parsed.data.isActive !== "false",
-        role: parsed.data.role,
         hourlyRate: parsed.data.hourlyRate ? parsed.data.hourlyRate : null,
         ...(pin
           ? { pinHash: hashPin(pin), failedPinAttempts: 0, pinLockedUntil: null }
@@ -113,9 +113,12 @@ const entrySchema = z.object({
   approve: z.string().optional(),
 });
 
-function totalFrom(clockIn: Date, clockOut: Date | null) {
+async function totalFrom(clockIn: Date, clockOut: Date | null, entryId?: string) {
   if (!clockOut) return null;
-  return Math.max(0, Math.round((clockOut.getTime() - clockIn.getTime()) / 60000));
+  const breaks = entryId
+    ? await prisma.breakLog.findMany({ where: { timeEntryId: entryId } })
+    : [];
+  return closedMinutes(clockIn, clockOut, breaks);
 }
 
 export async function upsertTimeEntry(formData: FormData) {
@@ -141,7 +144,7 @@ export async function upsertTimeEntry(formData: FormData) {
     userId: parsed.data.userId,
     clockIn,
     clockOut,
-    totalMinutes: totalFrom(clockIn, clockOut),
+    totalMinutes: await totalFrom(clockIn, clockOut, parsed.data.id),
     status: clockOut ? ("COMPLETED" as const) : ("ACTIVE" as const),
     source: TimeEntrySource.MANUAL,
     notes: parsed.data.notes,
