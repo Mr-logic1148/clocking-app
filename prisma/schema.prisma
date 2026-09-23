@@ -25,8 +25,11 @@ enum TimeEntrySource {
 }
 
 enum LeaveType {
-  HOLIDAY
-  SICK
+  PAID_HOLIDAY
+  SICK_LEAVE
+  MATERNITY_LEAVE
+  PATERNITY_LEAVE
+  UNPAID_LEAVE
 }
 
 enum RequestStatus {
@@ -58,6 +61,7 @@ model User {
   leaveReviews      LeaveRequest[] @relation("LeaveReviewedBy")
   shifts            ShiftAssignment[]
   shiftsCreated     ShiftAssignment[] @relation("ShiftCreatedBy")
+  shiftTemplates    ShiftTemplate[]
   swapsRequested    ShiftSwapRequest[] @relation("SwapRequester")
   swapsReceived     ShiftSwapRequest[] @relation("SwapCounterpart")
   swapsReviewed     ShiftSwapRequest[] @relation("SwapReviewedBy")
@@ -137,13 +141,16 @@ model LeaveRequest {
   @@index([status])
 }
 
+/// Scheduled shift (spec: Shift). startsAt/endsAt are the shift window.
 model ShiftAssignment {
   id          String   @id @default(cuid())
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   startsAt    DateTime
   endsAt      DateTime
+  station     String?
   label       String?
+  isRecurring Boolean  @default(false)
   createdById String
   createdBy   User     @relation("ShiftCreatedBy", fields: [createdById], references: [id])
   createdAt   DateTime @default(now())
@@ -152,7 +159,23 @@ model ShiftAssignment {
   swapsAsCounterpart ShiftSwapRequest[] @relation("CounterpartShift")
 
   @@index([userId, startsAt])
-  @@index([startsAt])
+  @@index([startsAt, endsAt])
+  @@index([userId])
+}
+
+model ShiftTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  station     String?
+  startTime   String
+  endTime     String
+  weekdays    Int[]
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([createdById])
 }
 
 model ShiftSwapRequest {

@@ -6,14 +6,9 @@ export default function HomePage() {
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#ecfdf5,_#f6f3ee_42%)]">
       <div className="mx-auto flex max-w-6xl flex-col px-6 py-10">
-        <header className="mb-16 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-emerald-800">
-            <Leaf className="h-6 w-6" />
-            <span className="text-sm font-semibold tracking-[0.18em] uppercase">Harvest Clock</span>
-          </div>
-          <Button asChild variant="outline">
-            <Link href="/login">Sign in</Link>
-          </Button>
+        <header className="mb-16 flex items-center gap-2 text-emerald-800">
+          <Leaf className="h-6 w-6" />
+          <span className="text-sm font-semibold tracking-[0.18em] uppercase">Harvest Clock</span>
         </header>
 
         <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-800">

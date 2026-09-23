@@ -92,6 +92,8 @@ export async function managerReviewLeave(formData: FormData) {
 
   const leave = await prisma.leaveRequest.findUnique({ where: { id }, include: { user: true } });
   if (!leave || leave.user.role !== "EMPLOYEE") return { error: "Leave request not found." };
+  // Security boundary: a manager can never approve their own leave — that is Admin-only.
+  if (leave.userId === session.user.id) return { error: "You cannot approve your own leave." };
 
   await prisma.leaveRequest.update({
     where: { id },

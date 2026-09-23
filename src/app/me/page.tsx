@@ -6,11 +6,11 @@ import { getKioskSnapshot, startOfLocalWeek } from "@/lib/time-engine";
 import { minutesToHoursLabel } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ActionForm } from "@/components/action-form";
-import { markBroadcastRead, requestLeave, requestShiftSwap } from "@/app/me/actions";
+import { LeaveRequestForm } from "@/components/leave-request-form";
+import { markBroadcastRead, requestShiftSwap } from "@/app/me/actions";
 
 export default async function MePage() {
   const session = await auth();
@@ -151,40 +151,7 @@ export default async function MePage() {
               <CardTitle>Request leave</CardTitle>
             </CardHeader>
             <CardContent>
-              <ActionForm action={requestLeave} success="Leave submitted" className="grid gap-3 md:grid-cols-2">
-                <div className="space-y-1">
-                  <Label>Type</Label>
-                  <select name="type" className="h-11 w-full rounded-xl border px-3 text-sm">
-                    <option value="HOLIDAY">Holiday</option>
-                    <option value="SICK">Sick</option>
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <Label>Start</Label>
-                  <Input name="startDate" type="date" required />
-                </div>
-                <div className="space-y-1">
-                  <Label>End</Label>
-                  <Input name="endDate" type="date" required />
-                </div>
-                <div className="space-y-1 md:col-span-2">
-                  <Label>Note</Label>
-                  <Input name="employeeNote" />
-                </div>
-                <Button type="submit">Submit request</Button>
-              </ActionForm>
-              <div className="mt-4 space-y-2">
-                {leaves.map((l) => (
-                  <div key={l.id} className="flex items-center justify-between text-sm">
-                    <span>
-                      {l.type} · {l.startDate.toLocaleDateString()}–{l.endDate.toLocaleDateString()}
-                    </span>
-                    <Badge tone={l.status === "PENDING" ? "amber" : l.status === "APPROVED" ? "green" : "rose"}>
-                      {l.status}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
+              <LeaveRequestForm leaves={leaves} heading="Your manager reviews holiday and sick leave." />
             </CardContent>
           </Card>
 

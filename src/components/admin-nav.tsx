@@ -9,13 +9,16 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 const links = [
-  { href: "/admin", label: "Live board" },
+  { href: "/admin", label: "Live" },
+  { href: "/admin/floor-plan", label: "Floor plan" },
+  { href: "/admin/schedule", label: "Schedule" },
+  { href: "/admin/leave", label: "Leave" },
   { href: "/admin/users", label: "Roles" },
   { href: "/admin/employees", label: "People" },
   { href: "/admin/timesheets", label: "Timesheets" },
   { href: "/admin/reports", label: "Reports" },
   { href: "/admin/notifications", label: "Audit" },
-  { href: "/me", label: "My hours" },
+  { href: "/me", label: "Hours" },
 ];
 
 export function AdminNav({

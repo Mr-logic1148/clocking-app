@@ -4,7 +4,7 @@ import { authConfig } from "@/auth.config";
 
 const { auth } = NextAuth(authConfig);
 
-/** Security boundary: /admin is ADMIN-only; /manager is MANAGER-only. */
+/** Security boundary: /admin is ADMIN-only; /manager and /dashboard are MANAGER-only. */
 export default auth((req) => {
   const { pathname } = req.nextUrl;
   const role = req.auth?.user?.role;
@@ -21,7 +21,7 @@ export default auth((req) => {
     }
   }
 
-  if (pathname.startsWith("/manager")) {
+  if (pathname.startsWith("/manager") || pathname.startsWith("/dashboard")) {
     if (!req.auth) {
       const url = new URL("/login", req.nextUrl.origin);
       url.searchParams.set("callbackUrl", pathname);
@@ -45,5 +45,5 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/admin/:path*", "/manager/:path*", "/me/:path*"],
+  matcher: ["/admin/:path*", "/manager/:path*", "/dashboard/:path*", "/me/:path*"],
 };
