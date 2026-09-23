@@ -14,7 +14,7 @@ export default function LoginPage() {
           </Link>
           <CardTitle>Sign in</CardTitle>
           <p className="text-sm text-stone-500">
-            Admins land on the live board. Employees only see their own hours.
+            Admins land on the live board. Managers land on the floor hub. Employees only see their own hours.
           </p>
         </CardHeader>
         <CardContent>

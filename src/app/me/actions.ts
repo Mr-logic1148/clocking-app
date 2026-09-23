@@ -1,17 +1,19 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { LeaveType } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { isLeaveType } from "@/lib/leave";
 
 export async function requestLeave(formData: FormData) {
   const session = await auth();
   if (!session?.user) return { error: "Unauthorized" };
-  if (session.user.role !== "EMPLOYEE") return { error: "Only employees can request leave." };
+  if (session.user.role !== "EMPLOYEE" && session.user.role !== "MANAGER") {
+    return { error: "Only staff can request leave." };
+  }
 
-  const type = String(formData.get("type") ?? "") as LeaveType;
-  if (type !== "HOLIDAY" && type !== "SICK") return { error: "Choose holiday or sick leave." };
+  const type = String(formData.get("type") ?? "");
+  if (!isLeaveType(type)) return { error: "Choose a valid leave type." };
   const startDate = new Date(String(formData.get("startDate")));
   const endDate = new Date(String(formData.get("endDate")));
   if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate < startDate) {
@@ -28,7 +30,9 @@ export async function requestLeave(formData: FormData) {
     },
   });
   revalidatePath("/me");
+  revalidatePath("/dashboard/leave");
   revalidatePath("/manager/leave");
+  revalidatePath("/admin/leave");
   return { ok: true };
 }
 

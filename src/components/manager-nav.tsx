@@ -8,12 +8,14 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const links = [
-  { href: "/manager/dashboard", label: "Floor" },
+  { href: "/manager/dashboard", label: "Live" },
+  { href: "/manager/floor-plan", label: "Floor plan" },
   { href: "/manager/schedule", label: "Schedule" },
   { href: "/manager/timesheets", label: "Timesheets" },
-  { href: "/manager/leave", label: "Leave" },
-  { href: "/manager/broadcasts", label: "Broadcasts" },
-  { href: "/me", label: "My hours" },
+  { href: "/manager/leave", label: "Team leave" },
+  { href: "/dashboard/leave", label: "My leave" },
+  { href: "/manager/broadcasts", label: "Alerts" },
+  { href: "/me", label: "Hours" },
 ];
 
 export function ManagerNav({
@@ -40,7 +42,7 @@ export function ManagerNav({
               href={l.href}
               className={cn(
                 "rounded-lg px-3 py-2 text-sm font-medium",
-                pathname === l.href
+                pathname === l.href || pathname.startsWith(l.href + "/")
                   ? "bg-emerald-50 text-emerald-900"
                   : "text-stone-600 hover:bg-stone-100 hover:text-stone-950",
               )}

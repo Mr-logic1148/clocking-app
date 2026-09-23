@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Delete, Leaf } from "lucide-react";
+import { Eye, EyeOff, Delete, Leaf } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "⌫"];
 
 export function KioskApp() {
   const [pin, setPin] = useState("");
+  const [showPin, setShowPin] = useState(false);
   const [busy, setBusy] = useState(false);
   const [snapshot, setSnapshot] = useState<KioskSnapshot | null>(null);
   const [remaining, setRemaining] = useState(KIOSK_IDLE_MS);
@@ -129,13 +130,25 @@ export function KioskApp() {
             >
               <h1 className="text-4xl font-semibold tracking-tight">Enter PIN</h1>
               <p className="mt-2 text-stone-300">4–6 digits. Only your own hours are shown after sign-in.</p>
-              <div className="mt-8 flex justify-center gap-3">
+              <div className="mt-8 flex items-center justify-center gap-3">
                 {Array.from({ length: Math.max(4, pin.length || 4) }).map((_, i) => (
                   <span
                     key={i}
-                    className={`h-4 w-4 rounded-full ${i < pin.length ? "bg-emerald-400" : "bg-white/20"}`}
-                  />
+                    className={`flex h-10 w-8 items-center justify-center rounded-lg text-lg font-semibold ${
+                      i < pin.length ? "bg-emerald-400 text-emerald-950" : "bg-white/20 text-transparent"
+                    }`}
+                  >
+                    {showPin ? pin[i] ?? "•" : i < pin.length ? "•" : ""}
+                  </span>
                 ))}
+                <button
+                  type="button"
+                  className="ml-2 text-stone-300 hover:text-white"
+                  onClick={() => setShowPin((v) => !v)}
+                  aria-label={showPin ? "Hide PIN" : "Show PIN"}
+                >
+                  {showPin ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
               </div>
               <div className="mt-10 grid grid-cols-3 gap-3">
                 {KEYS.map((key) => (
