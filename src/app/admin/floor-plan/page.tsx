@@ -6,7 +6,11 @@ import { adminAddShift, adminRemoveShift, adminSwapShifts } from "@/app/admin/sc
 export default async function AdminFloorPlanPage() {
   const [rows, people] = await Promise.all([
     getTodayFloorRows(["EMPLOYEE", "MANAGER", "ADMIN"]),
-    prisma.user.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
+    prisma.user.findMany({
+      where: { isActive: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
   ]);
 
   return (

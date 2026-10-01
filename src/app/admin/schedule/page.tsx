@@ -9,6 +9,7 @@ export default async function AdminSchedulePage() {
     prisma.user.findMany({
       where: { isActive: true, role: { in: ["EMPLOYEE", "MANAGER"] } },
       orderBy: { name: "asc" },
+      select: { id: true, name: true },
     }),
     prisma.shiftTemplate.findMany({ orderBy: { createdAt: "desc" }, take: 12 }),
     prisma.shiftAssignment.findMany({

@@ -6,7 +6,11 @@ import { startOfLocalWeek } from "@/lib/time-engine";
 export default async function ManagerSchedulePage() {
   const weekStart = startOfLocalWeek();
   const [people, templates, upcoming] = await Promise.all([
-    prisma.user.findMany({ where: { role: "EMPLOYEE", isActive: true }, orderBy: { name: "asc" } }),
+    prisma.user.findMany({
+      where: { role: "EMPLOYEE", isActive: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
     prisma.shiftTemplate.findMany({ orderBy: { createdAt: "desc" }, take: 12 }),
     prisma.shiftAssignment.findMany({
       where: { startsAt: { gte: weekStart }, user: { role: "EMPLOYEE" } },
